@@ -1,0 +1,187 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Retirement Roth Conversion Estimator</title>
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <main class="page">
+      <section class="panel panel-hero">
+        <p class="eyebrow">Vincent Planning Lab</p>
+        <h1>Roth Conversion Tax Savings Estimator</h1>
+        <p class="hero-copy">
+          Built for quick seminar use on mobile. Enter a few numbers and compare the top
+          three Roth conversion strategies by projected tax impact.
+        </p>
+      </section>
+
+      <section class="panel">
+        <h2>Build Your Estimate</h2>
+        <form id="estimator-form" class="estimator-form">
+          <fieldset class="form-section">
+            <legend>1. Retirement Accounts</legend>
+            <div class="form-grid">
+              <label>
+                Qualified Account Balance ($)
+                <input id="qualifiedBalance" name="qualifiedBalance" type="number" min="0" step="1000" inputmode="decimal" value="1200000" required />
+              </label>
+
+              <label>
+                Non-Qualified Account Balance ($)
+                <input id="nonQualifiedBalance" name="nonQualifiedBalance" type="number" min="0" step="1000" inputmode="decimal" value="350000" required />
+              </label>
+
+              <label>
+                Tax-Free Account Balance ($)
+                <input id="taxFreeBalance" name="taxFreeBalance" type="number" min="0" step="1000" inputmode="decimal" value="150000" required />
+              </label>
+
+              <label>
+                Annual Retirement Paycheck Goal ($)
+                <input id="annualPaycheck" name="annualPaycheck" type="number" min="0" step="1000" inputmode="decimal" placeholder="Leave blank to auto-calc at 4%" />
+              </label>
+            </div>
+          </fieldset>
+
+          <fieldset class="form-section">
+            <legend>2. Age and Tax Profile</legend>
+            <div class="form-grid">
+              <label>
+                Current Age
+                <input id="currentAge" name="currentAge" type="number" min="35" max="95" step="1" inputmode="numeric" value="55" required />
+              </label>
+
+              <label>
+                Retirement Start Age
+                <input id="retirementAge" name="retirementAge" type="number" min="50" max="80" step="1" inputmode="numeric" value="65" required />
+              </label>
+
+              <label>
+                Life Expectancy
+                <input id="lifeExpectancy" name="lifeExpectancy" type="number" min="70" max="105" step="1" inputmode="numeric" value="92" required />
+              </label>
+
+              <label>
+                Filing Status
+                <select id="filingStatus" name="filingStatus">
+                  <option value="mfj" selected>Married Filing Jointly</option>
+                  <option value="single">Single</option>
+                </select>
+              </label>
+
+              <label>
+                Current Annual Taxable Income ($)
+                <input id="currentAnnualTaxableIncome" name="currentAnnualTaxableIncome" type="number" min="0" step="1000" inputmode="decimal" placeholder="Pre-retirement taxable income" />
+                <span class="help">Used to estimate pre-retirement conversion room before age 65.</span>
+              </label>
+
+              <label>
+                Birth Year <span class="subtle">(optional)</span>
+                <input id="birthYear" name="birthYear" type="number" min="1900" max="2010" step="1" inputmode="numeric" placeholder="e.g. 1961" />
+              </label>
+
+              <label>
+                RMD Start Age Override <span class="subtle">(optional)</span>
+                <input id="rmdStartAgeOverride" name="rmdStartAgeOverride" type="number" min="70" max="80" step="1" inputmode="numeric" placeholder="Auto-derived from birth year" />
+              </label>
+            </div>
+          </fieldset>
+
+          <fieldset class="form-section">
+            <legend>3. Optional Social Security</legend>
+            <div class="form-grid">
+              <label>
+                Social Security Annual Benefit ($)
+                <input id="socialSecurityAnnual" name="socialSecurityAnnual" type="number" min="0" step="500" inputmode="decimal" placeholder="e.g. 42000" />
+              </label>
+
+              <label>
+                Social Security Start Age
+                <input id="socialSecurityStartAge" name="socialSecurityStartAge" type="number" min="62" max="75" step="1" inputmode="numeric" value="67" />
+              </label>
+            </div>
+          </fieldset>
+
+          <details class="advanced">
+            <summary>Advanced Assumptions</summary>
+            <div class="advanced-grid">
+              <label>
+                Qualified Return (%)
+                <input id="qualifiedReturnPct" name="qualifiedReturnPct" type="number" min="0" max="15" step="0.1" inputmode="decimal" value="5.0" />
+              </label>
+
+              <label>
+                Non-Qualified Return (%)
+                <input id="nonQualifiedReturnPct" name="nonQualifiedReturnPct" type="number" min="0" max="15" step="0.1" inputmode="decimal" value="4.5" />
+              </label>
+
+              <label>
+                Tax-Free Return (%)
+                <input id="taxFreeReturnPct" name="taxFreeReturnPct" type="number" min="0" max="15" step="0.1" inputmode="decimal" value="5.0" />
+              </label>
+
+              <label>
+                Inflation (%)
+                <input id="inflationPct" name="inflationPct" type="number" min="0" max="10" step="0.1" inputmode="decimal" value="2.5" />
+              </label>
+
+              <label>
+                Taxable Share of Non-Qualified Withdrawals (%)
+                <input id="nonQualifiedTaxablePct" name="nonQualifiedTaxablePct" type="number" min="0" max="100" step="1" inputmode="decimal" value="30" />
+              </label>
+            </div>
+          </details>
+
+          <div class="action-bar">
+            <button type="submit" class="primary">Run Strategy Comparison</button>
+            <p id="runStatus" class="run-status" aria-live="polite" hidden></p>
+          </div>
+        </form>
+      </section>
+
+      <section id="results" class="results hidden">
+        <div class="panel">
+          <h2>Top 3 Strategies</h2>
+          <p id="summaryText" class="subtle">Values shown in today&#39;s dollars.</p>
+          <div id="topStrategies" class="top-strategies"></div>
+        </div>
+
+        <div class="panel">
+          <h3>All Scenario Results</h3>
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>Strategy</th>
+                  <th>Avg. Tax Rate</th>
+                  <th>Total Taxes + IRMAA</th>
+                  <th>Total Net Income</th>
+                  <th>Total Net Legacy</th>
+                  <th>Savings vs Pro-Rata</th>
+                  <th>Net Income Increase</th>
+                  <th>Net Legacy Increase</th>
+                  <th>Total Value Created</th>
+                  <th>Total Converted</th>
+                </tr>
+              </thead>
+              <tbody id="resultsTableBody"></tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <section class="panel disclaimer">
+        <h3>Important Notes</h3>
+        <ul>
+          <li>This is an educational estimator and not tax, legal, or investment advice.</li>
+          <li>Results are directional estimates based on simplified assumptions and strategy rules.</li>
+          <li>Consult a qualified tax and financial professional before implementing any strategy.</li>
+        </ul>
+      </section>
+    </main>
+
+    <script type="module" src="./app.js"></script>
+  </body>
+</html>
