@@ -1,4 +1,4 @@
-# Roth Conversion Estimator
+# ROTH App
 
 Simple static web app to compare Roth conversion scenarios and rank the top 3 by estimated lifetime tax savings.
 
