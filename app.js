@@ -7,12 +7,12 @@ const TAX_CONFIG_BY_STATUS = {
     label: "Married Filing Jointly",
     standardDeduction: 30000,
     brackets: [
-      { cap: 23200, rate: 0.1 },
-      { cap: 94300, rate: 0.12 },
-      { cap: 201050, rate: 0.22 },
-      { cap: 383900, rate: 0.24 },
-      { cap: 487450, rate: 0.32 },
-      { cap: 731200, rate: 0.35 },
+      { cap: 23850, rate: 0.1 },
+      { cap: 96950, rate: 0.12 },
+      { cap: 206700, rate: 0.22 },
+      { cap: 394600, rate: 0.24 },
+      { cap: 501050, rate: 0.32 },
+      { cap: 751600, rate: 0.35 },
       { cap: Number.POSITIVE_INFINITY, rate: 0.37 },
     ],
     taxableSocialSecurity: { base1: 32000, base2: 44000, addAmount: 6000 },
@@ -24,12 +24,12 @@ const TAX_CONFIG_BY_STATUS = {
     label: "Single",
     standardDeduction: 15000,
     brackets: [
-      { cap: 11600, rate: 0.1 },
-      { cap: 47150, rate: 0.12 },
-      { cap: 100525, rate: 0.22 },
-      { cap: 191950, rate: 0.24 },
-      { cap: 243725, rate: 0.32 },
-      { cap: 609350, rate: 0.35 },
+      { cap: 11925, rate: 0.1 },
+      { cap: 48475, rate: 0.12 },
+      { cap: 103350, rate: 0.22 },
+      { cap: 197300, rate: 0.24 },
+      { cap: 250525, rate: 0.32 },
+      { cap: 626350, rate: 0.35 },
       { cap: Number.POSITIVE_INFINITY, rate: 0.37 },
     ],
     taxableSocialSecurity: { base1: 25000, base2: 34000, addAmount: 4500 },
@@ -168,8 +168,9 @@ function runModel(inputs) {
   }));
 
   const sortByOutcome = (a, b) => {
+    if (b.totalValueCreatedVsBaseline !== a.totalValueCreatedVsBaseline)
+      return b.totalValueCreatedVsBaseline - a.totalValueCreatedVsBaseline;
     if (a.totalTaxes !== b.totalTaxes) return a.totalTaxes - b.totalTaxes;
-    if (b.totalNetIncome !== a.totalNetIncome) return b.totalNetIncome - a.totalNetIncome;
     return b.totalNetLegacy - a.totalNetLegacy;
   };
 
@@ -389,7 +390,7 @@ function simulateStrategy(inputs, strategy) {
     const taxPayment = payTaxesFromBalances(
       evaluated.totalTax,
       afterConversion,
-      ["nonQualified", "taxFree", "qualified"]
+      ["nonQualified", "qualified", "taxFree"]
     );
 
     qualified = taxPayment.balancesAfter.qualified;
@@ -509,8 +510,7 @@ function evaluateYearWithConversion({
   irmaaThresholds,
   irmaaAnnualSurcharge,
 }) {
-  const nonQualifiedTaxFreeAvailable =
-    balancesAfterConversion.nonQualified + balancesAfterConversion.taxFree;
+  const nonQualifiedAvailable = balancesAfterConversion.nonQualified;
   const maxQualifiedForTax = balancesAfterConversion.qualified;
 
   const nonSSBase = baseNonSSOrdinary + conversionAmount;
@@ -534,7 +534,7 @@ function evaluateYearWithConversion({
     });
 
     const requiredQualified = clamp(
-      taxComputation.totalTax - nonQualifiedTaxFreeAvailable,
+      taxComputation.totalTax - nonQualifiedAvailable,
       0,
       maxQualifiedForTax
     );
@@ -741,7 +741,7 @@ function getRmdAmount(age, qualifiedBalance, rmdStartAge) {
   if (age < rmdStartAge) return 0;
   const divisors = {
     72: 27.4, 73: 26.5, 74: 25.5, 75: 24.6, 76: 23.7, 77: 22.9, 78: 22.0,
-    79: 21.1, 80: 20.2, 81: 19.4, 82: 18.5, 83: 17.7, 84: 16.8, 85: 16.0,
+    79: 21.1, 80: 20.2, 81: 19.4, 82: 18.6, 83: 17.7, 84: 16.8, 85: 16.0,
     86: 15.2, 87: 14.4, 88: 13.7, 89: 12.9, 90: 12.2, 91: 11.5, 92: 10.8,
     93: 10.1, 94: 9.5, 95: 8.9, 96: 8.4, 97: 7.8, 98: 7.3, 99: 6.8, 100: 6.4,
   };

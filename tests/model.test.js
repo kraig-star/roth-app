@@ -17,7 +17,7 @@ function makeGenericElement() {
 }
 
 function loadAppContext() {
-  const code = fs.readFileSync("/Users/kraigguffey/Documents/New project/app.js", "utf8");
+  const code = fs.readFileSync("/Users/kraigguffey/Documents/ROTH App/app.js", "utf8");
 
   const formEl = makeGenericElement();
 
@@ -79,12 +79,12 @@ function runTests() {
     irmaaThresholds: [212000, 266000, 334000, 400000, 750000],
     irmaaAnnualSurcharge: [2105, 5287, 8469, 11652, 12713],
     brackets: [
-      { cap: 23200, rate: 0.1 },
-      { cap: 94300, rate: 0.12 },
-      { cap: 201050, rate: 0.22 },
-      { cap: 383900, rate: 0.24 },
-      { cap: 487450, rate: 0.32 },
-      { cap: 731200, rate: 0.35 },
+      { cap: 23850, rate: 0.1 },
+      { cap: 96950, rate: 0.12 },
+      { cap: 206700, rate: 0.22 },
+      { cap: 394600, rate: 0.24 },
+      { cap: 501050, rate: 0.32 },
+      { cap: 751600, rate: 0.35 },
       { cap: Number.POSITIVE_INFINITY, rate: 0.37 },
     ],
   };
@@ -94,12 +94,12 @@ function runTests() {
     irmaaThresholds: [106000, 133000, 167000, 200000, 500000],
     irmaaAnnualSurcharge: [1052, 2644, 4235, 5826, 6356],
     brackets: [
-      { cap: 11600, rate: 0.1 },
-      { cap: 47150, rate: 0.12 },
-      { cap: 100525, rate: 0.22 },
-      { cap: 191950, rate: 0.24 },
-      { cap: 243725, rate: 0.32 },
-      { cap: 609350, rate: 0.35 },
+      { cap: 11925, rate: 0.1 },
+      { cap: 48475, rate: 0.12 },
+      { cap: 103350, rate: 0.22 },
+      { cap: 197300, rate: 0.24 },
+      { cap: 250525, rate: 0.32 },
+      { cap: 626350, rate: 0.35 },
       { cap: Number.POSITIVE_INFINITY, rate: 0.37 },
     ],
   };
@@ -256,8 +256,8 @@ function runTests() {
     const prev = model.top3[i - 1];
     const curr = model.top3[i];
     assert(
-      prev.totalTaxes <= curr.totalTaxes + 1e-9,
-      "Top 3 should be sorted by lowest total taxes first"
+      prev.totalValueCreatedVsBaseline >= curr.totalValueCreatedVsBaseline - 1e-9,
+      "Top 3 should be sorted by highest total value created first"
     );
   }
 
