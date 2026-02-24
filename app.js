@@ -45,6 +45,17 @@ const summaryTextEl = document.querySelector("#summaryText");
 const tableBodyEl = document.querySelector("#resultsTableBody");
 const runStatusEl = document.querySelector("#runStatus");
 
+// Toggle help text
+const taxPaymentModeCheckbox = typeof document !== "undefined" ? document.querySelector("#taxPaymentMode") : null;
+const taxPaymentModeHelp = typeof document !== "undefined" ? document.querySelector("#taxPaymentModeHelp") : null;
+if (taxPaymentModeCheckbox && taxPaymentModeHelp) {
+  taxPaymentModeCheckbox.addEventListener("change", () => {
+    taxPaymentModeHelp.textContent = taxPaymentModeCheckbox.checked
+      ? "Dynamic optimization: minimize total cost per year"
+      : "Fixed order: non-qualified \u2192 qualified \u2192 Roth";
+  });
+}
+
 if (form) {
   form.addEventListener("submit", (event) => {
     event.preventDefault();
@@ -139,6 +150,7 @@ function parseInputs(formData) {
     inflationRate: pctToDecimal(formData.get("inflationPct")),
     stateTaxRate: GEORGIA_STATE_TAX_RATE,
     nonQualifiedTaxableRatio: pctToDecimal(formData.get("nonQualifiedTaxablePct")),
+    taxPaymentMode: formData.get("taxPaymentMode") === "on" ? "advanced" : "simple",
   };
 }
 
@@ -363,6 +375,7 @@ function simulateStrategy(inputs, strategy) {
       brackets,
       irmaaThresholds,
       irmaaAnnualSurcharge,
+      taxPaymentMode: inputs.taxPaymentMode || "simple",
     });
 
     const afterConversion = {
@@ -385,13 +398,26 @@ function simulateStrategy(inputs, strategy) {
       brackets,
       irmaaThresholds,
       irmaaAnnualSurcharge,
+      taxPaymentMode: inputs.taxPaymentMode || "simple",
     });
 
-    const taxPayment = payTaxesFromBalances(
-      evaluated.totalTax,
-      afterConversion,
-      ["nonQualified", "qualified", "taxFree"]
-    );
+    let taxPayment;
+    if (inputs.taxPaymentMode === "advanced") {
+      const marginalRate = getMarginalRate(evaluated.taxableIncome, brackets, inputs.stateTaxRate);
+      const yearsRemaining = Math.max(1, inputs.lifeExpectancy - age);
+      const yearContext = {
+        marginalRate,
+        yearsRemaining,
+        returnRate: inputs.taxFreeReturnRate,
+      };
+      taxPayment = payTaxesDynamic(evaluated.totalTax, afterConversion, inputs, yearContext);
+    } else {
+      taxPayment = payTaxesFromBalances(
+        evaluated.totalTax,
+        afterConversion,
+        ["nonQualified", "qualified", "taxFree"]
+      );
+    }
 
     qualified = taxPayment.balancesAfter.qualified;
     nonQualified = taxPayment.balancesAfter.nonQualified;
@@ -509,16 +535,118 @@ function evaluateYearWithConversion({
   brackets,
   irmaaThresholds,
   irmaaAnnualSurcharge,
+  taxPaymentMode,
 }) {
   const nonQualifiedAvailable = balancesAfterConversion.nonQualified;
   const maxQualifiedForTax = balancesAfterConversion.qualified;
 
   const nonSSBase = baseNonSSOrdinary + conversionAmount;
+  const mode = taxPaymentMode || "simple";
 
   let qualifiedTaxPayment = 0;
   let taxComputation = null;
 
-  for (let i = 0; i < 24; i += 1) {
+  if (mode === "advanced") {
+    // In advanced mode, determine whether qualified or Roth is used for tax payment.
+    // If Roth is cheaper, no qualified tax payment cascade occurs.
+    // First compute tax with no qualified tax payment to get marginal rate.
+    taxComputation = computeTaxComponents({
+      nonSSOrdinaryIncome: nonSSBase,
+      socialSecurityGross,
+      filingStatusConfig: taxConfig,
+      standardDeduction,
+      brackets,
+      stateTaxRate: inputs.stateTaxRate,
+      age,
+      yearIndex,
+      magiHistory,
+      irmaaThresholds,
+      irmaaAnnualSurcharge,
+    });
+
+    const taxAfterNQ = Math.max(0, taxComputation.totalTax - nonQualifiedAvailable);
+    if (taxAfterNQ > 0) {
+      const marginalRate = getMarginalRate(taxComputation.taxableIncome, brackets, inputs.stateTaxRate);
+      const yearsRemaining = Math.max(1, (inputs.lifeExpectancy || 92) - age);
+      const rothCostPerDollar = 1 + (Math.pow(1 + (inputs.taxFreeReturnRate || 0.05), yearsRemaining) - 1);
+      const qualifiedCostPerDollar = marginalRate < 1 ? 1 / (1 - marginalRate) : Infinity;
+
+      if (qualifiedCostPerDollar <= rothCostPerDollar) {
+        // Qualified is cheaper — use cascade recursion for qualified portion
+        for (let i = 0; i < 24; i += 1) {
+          taxComputation = computeTaxComponents({
+            nonSSOrdinaryIncome: nonSSBase + qualifiedTaxPayment,
+            socialSecurityGross,
+            filingStatusConfig: taxConfig,
+            standardDeduction,
+            brackets,
+            stateTaxRate: inputs.stateTaxRate,
+            age,
+            yearIndex,
+            magiHistory,
+            irmaaThresholds,
+            irmaaAnnualSurcharge,
+          });
+
+          const requiredQualified = clamp(
+            taxComputation.totalTax - nonQualifiedAvailable,
+            0,
+            maxQualifiedForTax
+          );
+
+          if (Math.abs(requiredQualified - qualifiedTaxPayment) < 0.01) {
+            qualifiedTaxPayment = requiredQualified;
+            break;
+          }
+          qualifiedTaxPayment = requiredQualified;
+        }
+
+        taxComputation = computeTaxComponents({
+          nonSSOrdinaryIncome: nonSSBase + qualifiedTaxPayment,
+          socialSecurityGross,
+          filingStatusConfig: taxConfig,
+          standardDeduction,
+          brackets,
+          stateTaxRate: inputs.stateTaxRate,
+          age,
+          yearIndex,
+          magiHistory,
+          irmaaThresholds,
+          irmaaAnnualSurcharge,
+        });
+      }
+      // else: Roth is cheaper — no qualified cascade, qualifiedTaxPayment stays 0
+    }
+  } else {
+    // Simple mode: original fixed-order recursion
+    for (let i = 0; i < 24; i += 1) {
+      taxComputation = computeTaxComponents({
+        nonSSOrdinaryIncome: nonSSBase + qualifiedTaxPayment,
+        socialSecurityGross,
+        filingStatusConfig: taxConfig,
+        standardDeduction,
+        brackets,
+        stateTaxRate: inputs.stateTaxRate,
+        age,
+        yearIndex,
+        magiHistory,
+        irmaaThresholds,
+        irmaaAnnualSurcharge,
+      });
+
+      const requiredQualified = clamp(
+        taxComputation.totalTax - nonQualifiedAvailable,
+        0,
+        maxQualifiedForTax
+      );
+
+      if (Math.abs(requiredQualified - qualifiedTaxPayment) < 0.01) {
+        qualifiedTaxPayment = requiredQualified;
+        break;
+      }
+      qualifiedTaxPayment = requiredQualified;
+    }
+
     taxComputation = computeTaxComponents({
       nonSSOrdinaryIncome: nonSSBase + qualifiedTaxPayment,
       socialSecurityGross,
@@ -532,33 +660,7 @@ function evaluateYearWithConversion({
       irmaaThresholds,
       irmaaAnnualSurcharge,
     });
-
-    const requiredQualified = clamp(
-      taxComputation.totalTax - nonQualifiedAvailable,
-      0,
-      maxQualifiedForTax
-    );
-
-    if (Math.abs(requiredQualified - qualifiedTaxPayment) < 0.01) {
-      qualifiedTaxPayment = requiredQualified;
-      break;
-    }
-    qualifiedTaxPayment = requiredQualified;
   }
-
-  taxComputation = computeTaxComponents({
-    nonSSOrdinaryIncome: nonSSBase + qualifiedTaxPayment,
-    socialSecurityGross,
-    filingStatusConfig: taxConfig,
-    standardDeduction,
-    brackets,
-    stateTaxRate: inputs.stateTaxRate,
-    age,
-    yearIndex,
-    magiHistory,
-    irmaaThresholds,
-    irmaaAnnualSurcharge,
-  });
 
   return {
     ...taxComputation,
@@ -735,6 +837,62 @@ function payTaxesFromBalances(totalTax, balances, order) {
     remainingTax -= amount;
   }
   return { balancesAfter: after, unpaidTax: Math.max(0, remainingTax) };
+}
+
+function payTaxesDynamic(totalTax, balances, inputs, yearContext) {
+  let remainingTax = totalTax;
+  const after = { ...balances };
+
+  // Step 1: Always drain nonQualified first (no tax impact)
+  const nqPay = Math.min(after.nonQualified, remainingTax);
+  after.nonQualified -= nqPay;
+  remainingTax -= nqPay;
+
+  if (remainingTax <= 0.01) {
+    return { balancesAfter: after, unpaidTax: 0 };
+  }
+
+  // Step 2: Compare qualified cost vs Roth opportunity cost
+  const { marginalRate, yearsRemaining, returnRate } = yearContext;
+
+  // Qualified cost: tax cascade. Withdrawing X from qualified generates
+  // additional taxable income, so true cost = X / (1 - marginalRate)
+  const qualifiedCostPerDollar = marginalRate < 1 ? 1 / (1 - marginalRate) : Infinity;
+
+  // Roth opportunity cost: lost tax-free growth over remaining years
+  // Cost of using $1 of Roth = the future growth forfeited
+  const rothGrowthForfeited = Math.pow(1 + returnRate, yearsRemaining) - 1;
+  const rothCostPerDollar = 1 + rothGrowthForfeited; // total cost including principal
+
+  // Pick cheaper source first
+  let firstSource, secondSource;
+  if (qualifiedCostPerDollar <= rothCostPerDollar) {
+    firstSource = "qualified";
+    secondSource = "taxFree";
+  } else {
+    firstSource = "taxFree";
+    secondSource = "qualified";
+  }
+
+  for (const bucket of [firstSource, secondSource]) {
+    if (remainingTax <= 0.01) break;
+    const amount = Math.min(after[bucket], remainingTax);
+    after[bucket] -= amount;
+    remainingTax -= amount;
+  }
+
+  return { balancesAfter: after, unpaidTax: Math.max(0, remainingTax) };
+}
+
+function getMarginalRate(taxableIncome, brackets, stateTaxRate) {
+  let federalRate = 0;
+  for (const bracket of brackets) {
+    if (taxableIncome <= bracket.cap) {
+      federalRate = bracket.rate;
+      break;
+    }
+  }
+  return federalRate + stateTaxRate;
 }
 
 function getRmdAmount(age, qualifiedBalance, rmdStartAge) {

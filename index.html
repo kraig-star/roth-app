@@ -107,6 +107,20 @@
           <details class="advanced">
             <summary>Advanced Assumptions</summary>
             <div class="advanced-grid">
+              <label class="toggle-label">
+                Tax Payment Mode
+                <div class="toggle-row">
+                  <span class="toggle-option" id="modeSimpleLabel">Simple</span>
+                  <label class="toggle-switch">
+                    <input type="checkbox" id="taxPaymentMode" name="taxPaymentMode" />
+                    <span class="toggle-slider"></span>
+                  </label>
+                  <span class="toggle-option" id="modeAdvancedLabel">Advanced</span>
+                </div>
+                <span class="help" id="taxPaymentModeHelp">Fixed order: non-qualified → qualified → Roth</span>
+              </label>
+            </div>
+            <div class="advanced-grid">
               <label>
                 Qualified Return (%)
                 <input id="qualifiedReturnPct" name="qualifiedReturnPct" type="number" min="0" max="15" step="0.1" inputmode="decimal" value="5.0" />
